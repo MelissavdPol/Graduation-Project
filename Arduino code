@@ -11,13 +11,6 @@
 // Declare our NeoPixel strip object:
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-// distance sensor
-const int trigPin = 9;
-const int echoPin = 10;
-// defines variables
-long duration;
-int distance;
-
 //  LDRs
 int res = 0;
 int sensor = A0;
@@ -29,12 +22,11 @@ int res4 = 0;
 int sensor4 = A4;
 
 //  Potentiometers
-const int analogInPin = A5;  // Analog input pin that the potentiometer is attached to
-const int analogInPin2 = A7;
+const int analogInPin = A5;  // Analog input pin that the potentiometer is 
+attached to
 
 // Startvalues of potentiometers
 int sensorValue = 0;
-int sensorValue2 = 0;
 
 float Lon = 0; // Amount of LEDs that are lighted up
 float amountReps = 0;
@@ -49,7 +41,6 @@ int amount = 0;
 int rep = 0; // Which rep you are currently doing
 int change = 700; // LDR dark or light difference
 int repTime = 0;
-int lastLed = 0;
 int greenLight = 0; // check which LEDs are already green
 int timer = 0; // absence timer for reset
 int switchTimer = 0; // switch is turned on timer
@@ -62,57 +53,27 @@ bool secondCheck = false;
 
 void setup() {
   Serial.begin(9600);
-  // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
-  // Any other board, you can remove this part (but no harm leaving it):
-#if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
-  clock_prescale_set(clock_div_1);
-#endif
-  // END of Trinket-specific code.
-
-  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
+  
+  strip.begin();           // initialise NeoPixel strip object
   strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
+  strip.setBrightness(50); // Set the brightness
 
-  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
-  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
 }
-void(* resetFunc) (void) = 0;//declare reset function at address 0
 
+void(* resetFunc) (void) = 0;//declare reset function at address 0
 
 void loop() {
 
-//  Serial.println(timer);
-  //// distance sensor
-  //  // Clears the trigPin
-  //  digitalWrite(trigPin, LOW);
-  ////  delayMicroseconds(10);
-  //  // Sets the trigPin on HIGH state for 10 micro seconds
-  //  digitalWrite(trigPin, HIGH);
-  ////  delayMicroseconds(10);
-  //  digitalWrite(trigPin, LOW);
-  //  // Reads the echoPin, returns the sound wave travel time in microseconds
-  //  duration = pulseIn(echoPin, HIGH);
-  //  // Calculating the distance
-  //  distance = duration * 0.034 / 2;
-  //  // Prints the distance on the Serial Monitor
-  //  if ( distance > 0 or distance < 788) {
-  ////    Serial.print("Distance: ");
-  ////    Serial.println(distance);
-  //  }
-
   sensorValue = analogRead(analogInPin);
-  sensorValue2 = analogRead(analogInPin2);
   if (!started) {
     if (firstCheck) {
       amountReps = map(sensorValue, 0, 1024, 1, 21);
     } else {
       repTime = map(sensorValue, 0, 1024, 1, 11);
       changeStep = 255 / repTime ;
-      //    Serial.println(repTime);
     }
   }
 
-//  Serial.println(sensorValue);
   amountLeds = strip.numPixels() / amountReps;
 
   /* getting the value of photoresistor*/
@@ -146,11 +107,7 @@ void loop() {
     resetFunc(); //call reset
   }
 
-
-
   if (!started) {
-
-    //    rainbow(10);
 
     if (firstCheck) {
       for (int i = 0; i < strip.numPixels() ; i++) {
@@ -176,7 +133,6 @@ void loop() {
 
       for (int i = 0 ; i < repTime ; i++) {
         strip.setPixelColor(i, strip.Color(255, 255, 0));
-
       }
       strip.show();
     }
@@ -184,10 +140,6 @@ void loop() {
     if ((res2 >= change & res4 >= change) & !firstCheck) {
       secondCheck = true;
     }
-    //    Serial.print(firstCheck);
-    //    Serial.print(" ");
-    //    Serial.println(secondCheck);
-
 
     if ((res2 <= change or res4 <= change)  & secondCheck) {
       secondCheck = false;
@@ -201,20 +153,20 @@ void loop() {
     }
   }
 
-
   if (started & switchState) {
 
     if ((res2 <= change || res4 <= change) ) {
       nextRep = true;
     }
 
-
-    if (nextRep == true & (res2 >= change || res4 >= change) & greenValue >= 255 & Lon < strip.numPixels()) {
+    if (nextRep == true & (res2 >= change || res4 >= change) & greenValue >= 
+    255 & Lon < strip.numPixels()) {
       blueValue = 255;
       greenValue = 0;
     }
 
-    if (nextRep == true & (res <= change || res3 <= change) & (res2 >= change || res4 >= change) & greenValue <= 255) {
+    if (nextRep == true & (res <= change || res3 <= change) & (res2 >= 
+    change || res4 >= change) & greenValue <= 255) {
       blueValue -= changeStep;
       greenValue += changeStep;
 
@@ -223,15 +175,16 @@ void loop() {
       greenValue = min(greenValue, 255);
     }
 
-    if (greenValue <= 255 & ((res2 <= change || res4 <= change) or (res >= change or res3 >= change))) {
+    if (greenValue <= 255 & ((res2 <= change || res4 <= change) or (res >= 
+    change or res3 >= change))) {
       blueValue = 255;
       greenValue = 0;
       strip.show();
       delay(30);
     }
 
-
-    if (nextRep == true & (res <= change || res3 <= change) & (res2 >= change || res4 >= change)) {
+    if (nextRep == true & (res <= change || res3 <= change) & (res2 >= 
+    change || res4 >= change)) {
       // Fill along the length of the strip in various colors...
       colorWipe( strip.Color(0, greenValue, blueValue), 600); // Green
 
@@ -244,13 +197,10 @@ void loop() {
       }
 
       Lon = amountLeds * (rep + 1);
-      //        Lon = min(Lon, strip.numPixels());
       nextRep = false;
     }
 
-
     // starting the end phase
-
     if (Lon >= (strip.numPixels() + amountLeds) ) {
       timer = 0;
       for (int amount = 0 ; amount <= 200; amount++) {
@@ -279,18 +229,7 @@ void loop() {
 void colorWipe(uint32_t color, int wait) {
   for (int i = greenLight; i < Lon; i++) { // For each pixel in strip...
     strip.setPixelColor(i, color);         //  Set pixel's color (in RAM)
-    lastLed = i;
   }
   delay(wait);
   strip.show();
-}
-
-
-// Rainbow cycle along whole strip. Pass delay time (in ms) between frames.
-void rainbow(int wait) {
-  for (long firstPixelHue = 0; firstPixelHue < 65536; firstPixelHue += 256) {
-    strip.rainbow(firstPixelHue);
-    strip.show(); // Update strip with new contents
-    delay(wait);  // Pause for a moment
-  }
 }
