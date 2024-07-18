@@ -1,0 +1,443 @@
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+#include <avr/power.h> // Required for 16 MHz Adafruit Trinket
+#endif
+
+#define LED_PIN    8
+
+// How many NeoPixels are attached to the Arduino?
+#define LED_COUNT 24
+
+// Declare our NeoPixel strip object:
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// defines pins numbers of the two distance sensors
+const int trigPin = 9;
+const int echoPin = 10;
+
+const int trigPin2 = 11;
+const int echoPin2 = 12;
+
+// variables of the distance sensors
+long duration;
+long duration2;
+int distance;
+int distance2;
+
+//  LDRs
+int res = 0;
+int sensor = A0;
+int res2 = 0;
+int sensor2 = A1;
+int res3 = 0;
+int sensor3 = A2;
+int res4 = 0;
+int sensor4 = A4;
+
+//  Potentiometers
+const int analogInPin = A5;  // Analog input pin that the potentiometer is attached to
+const int analogInPin2 = A7;
+
+// Startvalues of potentiometers
+int sensorValue = 0;
+int sensorValue2 = 0;
+
+float Lon = 0; // Amount of LEDs that are lighted up
+float amountReps = 0;
+float amountLeds = 0; // amount of leds that have to turn on each rep
+float footDistance = 0;
+float footHeight = 0;
+float footTooHigh = 0;
+float footTooLow = 0;
+
+int blueValue = 255;
+int greenValue = 0;
+int changeStep = 50;  // Adjust for faster/slower transition
+int brightness = 255;
+int turn = -255; // amount blue/green value have to change per time
+int amount = 0;
+int rep = 0; // Which rep you are currently doing
+int change = 700; // LDR dark or light difference
+int repTime = 0;
+int lastLed = 0;
+int greenLight = 0; // check which LEDs are already green
+int timer = 0; // absence timer for reset
+int switchTimer = 0; // switch is turned on timer
+int startTimer = 0;
+
+
+bool started = false;
+bool nextRep = true;
+bool switchState = true;
+bool firstCheck = true;
+bool secondCheck = false;
+
+bool rainbowMode = false;
+bool rainbowCheck = false;
+bool rainbowCanStart = false;
+bool up = true;
+
+
+void setup() {
+  Serial.begin(9600);
+  // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
+  // Any other board, you can remove this part (but no harm leaving it):
+#if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+  clock_prescale_set(clock_div_1);
+#endif
+  // END of Trinket-specific code.
+
+  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
+  strip.show();            // Turn OFF all pixels ASAP
+  strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
+
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+  pinMode(trigPin2, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin2, INPUT); // Sets the echoPin as an Input
+
+}
+void(* resetFunc) (void) = 0;//declare reset function at address 0
+
+
+void loop() {
+  startTimer += 1;
+
+  if (startTimer <= 5) {
+
+    if (!started) {
+      // Clears the trigPin
+      digitalWrite(trigPin2, LOW);
+      // Sets the trigPin on HIGH state for 10 micro seconds
+      digitalWrite(trigPin2, HIGH);
+      digitalWrite(trigPin2, LOW);
+      // Reads the echoPin, returns the sound wave travel time in microseconds
+      duration2 = pulseIn(echoPin2, HIGH);
+      // Calculating the distance
+      if (duration2 > 0 & duration2 < 100 / 0.034 * 2) {
+        distance2 = duration2 * 0.034 / 2;
+      } else {
+        distance2 = 0;
+      }
+    }
+  }
+  [[[[[[[[[[[[[[[[[[[[[
+                        sensorValue = analogRead(analogInPin);
+                        sensorValue2 = analogRead(analogInPin2);
+
+  if (startTimer > 5) {
+    if (!started) {
+      if (distance2 > 5) {
+        rainbowMode = true;
+
+        if (!rainbowCanStart & !rainbowCheck) {
+          rainbow(10);
+        }
+
+      } else {
+        //      rainbowCanStart = true;
+        //      rainbowCheck = false;
+        rainbowMode = false;
+      }
+
+      if ((rainbowCanStart & rainbowMode) or (!rainbowCanStart & !rainbowMode)) {
+        if (firstCheck) {
+          amountReps = map(sensorValue, 0, 1024, 1, 21);
+        } else {
+          repTime = map(sensorValue, 0, 1024, 1, 11);
+          if (rainbowMode) {
+            repTime = map(sensorValue, 0, 1024, 1, 6);
+          }
+          changeStep = 255 / repTime ;
+          footDistance = 15 / repTime;
+        }
+      }
+    }
+
+
+    amountLeds = strip.numPixels() / amountReps;
+
+    /* getting the value of photoresistor*/
+    res = analogRead(sensor);
+    res2 = analogRead(sensor2);
+    res3 = analogRead(sensor3);
+    res4 = analogRead(sensor4);
+
+
+    if (res == 0) {
+      switchState = false;
+    }
+    if (switchState == false and res > 0) {
+      switchTimer += 1;
+    } else {
+      switchTimer = 0;
+    }
+    if (switchTimer == 10) {
+      switchState = true;
+      resetFunc(); //call reset
+    }
+
+
+    if ((res >= change & res3 >= change) or (res2 <= change & res4 <= change)) {
+      timer += 1;
+    } else {
+      timer = 0;
+    }
+    if ((started & timer >= 500) or (!started & timer >= 2000) ) {
+      resetFunc(); //call reset
+    }
+
+
+
+    if (!started) {
+
+      if (rainbowMode & (res2 <= change or res4 <= change) & !secondCheck) {
+        rainbowCheck = true;
+        for (int i = 0; i < strip.numPixels() ; i++) {
+          strip.setPixelColor(i, strip.Color(0, 0, 0));
+        }
+        strip.show();
+      }
+
+      if ((rainbowMode & !rainbowCanStart & rainbowCheck & !secondCheck & (res2 >= change and res4 >= change))) {
+        rainbowCanStart = true;
+      }
+
+      if ((rainbowCanStart & rainbowMode) or (!rainbowCanStart & !rainbowMode)) {
+        if (firstCheck) {
+          for (int i = 0; i < strip.numPixels() ; i++) {
+            strip.setPixelColor(i, strip.Color(0, 0, 0));
+          }
+
+          for (int i = 0 ; i < amountReps ; i++) {
+            strip.setPixelColor(i, strip.Color(0, 255, 255));
+
+          }
+          strip.show();
+        }
+
+        if ((res2 <= change or res4 <= change) & !secondCheck ) {
+          firstCheck = false;
+          timer = 0;
+        }
+
+        if (secondCheck) {
+          for (int i = 0; i < strip.numPixels() ; i++) {
+            strip.setPixelColor(i, strip.Color(0, 0, 0));
+          }
+
+          for (int i = 0 ; i < repTime ; i++) {
+            strip.setPixelColor(i, strip.Color(255, 255, 0));
+
+          }
+          strip.show();
+        }
+
+        if ((res2 >= change & res4 >= change) & !firstCheck) {
+          secondCheck = true;
+        }
+
+        if ((res2 <= change or res4 <= change)  & secondCheck) {
+          secondCheck = false;
+          for (int i = 0; i < strip.numPixels(); i++) {
+            strip.setPixelColor(i, strip.Color(0, 0, 255));
+          }
+          strip.show();
+          timer = 0;
+          started = true;
+          Lon = amountLeds;
+        }
+      }
+    }
+
+
+    if (started & switchState) {
+      if (!rainbowMode) {
+        if ((res2 <= change || res4 <= change) ) {
+          nextRep = true;
+        }
+
+
+        if (nextRep == true & (res2 >= change || res4 >= change) & greenValue >= 255 & Lon < strip.numPixels()) {
+          blueValue = 255;
+          greenValue = 0;
+        }
+
+        if (nextRep == true & (res <= change || res3 <= change) & (res2 >= change || res4 >= change) & greenValue <= 255) {
+          blueValue -= changeStep;
+          greenValue += changeStep;
+
+          //    Limit values to 0 - 255 range
+          blueValue = max(blueValue, 0);
+          greenValue = min(greenValue, 255);
+        }
+
+        if (greenValue <= 255 & ((res2 <= change || res4 <= change) or (res >= change or res3 >= change))) {
+          blueValue = 255;
+          greenValue = 0;
+          strip.show();
+          delay(30);
+        }
+
+
+        if (nextRep == true & (res <= change || res3 <= change) & (res2 >= change || res4 >= change)) {
+          // Fill along the length of the strip in various colors...
+          colorWipe( strip.Color(0, greenValue, blueValue), 600); // Green
+
+        }
+        if (greenValue >= 255 & nextRep == true) {
+          rep += 1;
+          greenLight = Lon;
+          if (greenLight < Lon) {
+            greenLight += 1;
+          }
+
+          Lon = amountLeds * (rep + 1);
+          //        Lon = min(Lon, strip.numPixels());
+          nextRep = false;
+        }
+      }
+      // The mode for the step up and down exercise
+      if (rainbowMode) {
+
+        digitalWrite(trigPin, LOW);
+        // Sets the trigPin on HIGH state for 10 micro seconds
+        digitalWrite(trigPin, HIGH);
+        digitalWrite(trigPin, LOW);
+        // Reads the echoPin, returns the sound wave travel time in microseconds
+        duration = pulseIn(echoPin, HIGH);
+        // Calculating the distance
+        if (duration > 0 & duration < 100 / 0.034 * 2) {
+          distance = duration * 0.034 / 2;
+        } else {
+          distance = 0;
+        }
+        
+        // determining when the foot is too high or low.
+        footTooHigh = footHeight + footDistance ;
+        footTooLow = footHeight - footDistance;
+
+        //Making the outcome of the distance sensor more reliable when standing on it.
+        if (greenValue == 255 & footHeight == 0 ) {
+          footHeight = 2;
+        }
+
+        // User is standing on the platform
+        if (distance <= 2) {
+          nextRep = true;
+          if (greenValue == 0) {
+            footHeight = footDistance;
+          }
+        }
+
+        // Changing the values of the colours during a rep 
+        if (nextRep == true & (res <= change || res3 <= change) & ( greenValue <= 255 or blueValue >= 0) ) {
+          if (up & distance > footTooLow & (distance < footTooHigh or distance > 15) & distance >= footHeight ) {
+            greenValue += changeStep;
+            footHeight += footDistance;
+          }
+          if (!up & distance >= footTooLow & (distance < footTooHigh or distance > 15) & distance < footHeight) {
+            blueValue -= changeStep;
+            footHeight -= footDistance;
+          }
+
+          footHeight = min(footHeight, 15);
+
+          //    Limit values to 0 - 255 range
+          blueValue = max(blueValue, 0);
+          greenValue = min(greenValue, 255);
+        }
+
+        // If you go too fast or slow it blinks red to show you have to go back down
+        if (((distance > footTooHigh & distance < 15) or distance < footTooLow)) {
+          blueValue = 255;
+          greenValue = 0;
+          colorWipe( strip.Color(255, 0, 0), 600); // Red
+          footHeight = footDistance;
+          up = true;
+          strip.show();
+        }
+
+        //Changing the colour of the LEDs
+        if (nextRep == true) {
+          // Fill along the length of the strip in various colors...
+          if (up) {
+            colorWipe( strip.Color(greenValue, greenValue, 255), 300); // White
+          } else {
+            colorWipe( strip.Color(blueValue, 255, blueValue), 300); // Green
+          }
+
+        }
+
+        //Going back down
+        if (greenValue >= 255 & up  == true & distance >= 15) {
+          up = false;
+          footHeight -= footDistance;
+        }
+        
+        // Conintue to the next rep
+        if (blueValue <= 0 & greenValue >= 255 & nextRep == true) {
+          blueValue = 255;
+          greenValue = 0;
+          footHeight = footDistance;
+          up = true;
+          rep += 1;
+          greenLight = Lon;
+          if (greenLight < Lon) {
+            greenLight += 1;
+          }
+
+          Lon = amountLeds * (rep + 1);
+          //        Lon = min(Lon, strip.numPixels());
+          nextRep = false;
+        }
+
+      }
+
+      // starting the end phase
+
+      if (Lon >= (strip.numPixels() + amountLeds) ) {
+        timer = 0;
+        for (int amount = 0 ; amount <= 200; amount++) {
+          for (int i = 0; i < strip.numPixels(); i++) {
+            strip.setPixelColor(i, strip.Color(0, brightness, 0));
+          }
+          strip.show();
+          delay(30);
+
+          if (brightness <= 0 ) {
+            turn += 50;
+          }
+          if (brightness >= 255) {
+            turn = -50;
+          }
+          brightness = turn + brightness;
+
+          brightness = min(brightness, 255);
+          brightness = max(brightness, 0);
+        }
+        resetFunc(); //call reset
+      }
+    }
+  }
+}
+
+// Changing the colors of selected LEDs
+void colorWipe(uint32_t color, int wait) {
+  for (int i = greenLight; i < Lon; i++) { // For each pixel in strip...
+    strip.setPixelColor(i, color);         //  Set pixel's color (in RAM)
+    lastLed = i;
+  }
+  delay(wait);
+  strip.show();
+}
+
+
+// Rainbow cycle along whole strip. Pass delay time (in ms) between frames.
+void rainbow(int wait) {
+  for (long firstPixelHue = 0; firstPixelHue < 65536; firstPixelHue += 256) {
+    strip.rainbow(firstPixelHue);
+    strip.show(); // Update strip with new contents
+    delay(wait);  // Pause for a moment
+  }
+}
